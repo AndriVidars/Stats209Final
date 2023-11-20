@@ -9,4 +9,77 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(dplyr)
+source('dataProcessing.R')
+dlexp = loadData()
+```
+
+
+```{r}
+#FRT
+meanDiff <- function(z, y){
+  ZY = data.frame(z)
+  ZY$y = y
+  treat = filter(ZY, z == 1)
+  ctrl = filter(ZY, z == 0)
+  
+  return (mean(treat$y) - mean(ctrl$y))
+}
+
+# Fisher randomization test
+frtSim <- function(z, y, M, testStat){
+  tSims = vector(, M)
+  for (i in 1:M){
+    set.seed(i)
+    zSim = sample(z)
+    tSims[i] = testStat(zSim, y)
+  }
+
+  return (tSims)
+}
+
+pVal <- function(tObserved, tzSims, M){
+  return (length(which(tzSims >= tObserved))/M)
+}
+```
+
+```{r}
+Z = dlexp$video
+Y = dlexp$response
+
+tObs = meanDiff(Z, Y)
+
+M = 10000
+tSims = frtSim(Z, Y, M, meanDiff)
+p = pVal(tObs, tSims, M)
+
+print(tObs)
+print(p)
+
+# maybe some mistakes in code, keep getting 0 for p_val
+```
+
+```{r}
+# Neyman
+
+s_2_x <- function(x){
+  sub_ = filter(dlexp, video == x)
+  n_x = nrow(sub_)
+
+  return (c(var(sub_$response), n_x))
+}
+
+# normal approx 95% confidence interval
+ci <- function(that, vhat){
+  return (c(that - 1.96*sqrt(vhat), that + 1.96*sqrt(vhat)))
+}
+
+s_2_1 = s_2_x(1)
+s_2_0 = s_2_x(0)
+
+v_hat = (s_2_1[1]/s_2_1[2]) + (s_2_0[1]/s_2_0[2])
+
+print(ci(tObs, v_hat))
+```
 
