@@ -1,0 +1,142 @@
+---
+title: "Stats 209 Final - EDA"
+author: "Andri, Eden, Veronica"
+date: "11/8/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r warning=FALSE,message=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+load("C:/Stanford/Au23/Stats209/final/dlexpdata.rdata")
+load("C:/Stanford/Au23/Stats209/final/densities.rdata")
+```
+
+```{r}
+# should we include is not sure inside this?
+dlexpdata$response <- NA
+dlexpdata$response[dlexpdata$agree == "Approve strongly"] <- 2
+dlexpdata$response[dlexpdata$agree == "Approve somewhat"] <- 1
+dlexpdata$response[dlexpdata$agree == "Neither approve nor disapprove"] <- 0
+dlexpdata$response[dlexpdata$agree == "Disapprove somewhat"] <- -1
+dlexpdata$response[dlexpdata$agree == "Disapprove strongly"] <- -2
+
+
+dlexp <- filter(dlexpdata, !is.na(response))
+dlexp$female = factor(dlexp$female)
+dlexp$white = factor(dlexp$white)
+```
+
+```{r}
+# start of with plots displaying Z and Y, not including X
+del_cue_names <- c('0' = "No Video", '1' = "Video")
+party_cue_names <- c('0' = "No Party Cue", '1' = "Party Cue")
+
+
+ggplot(data=dlexp, aes(x=response)) + 
+  geom_bar(color="black", fill="lightblue") + facet_grid(party.cues ~ video, labeller = labeller(
+        party.cues = party_cue_names,
+        video = del_cue_names
+    ))
+
+
+```
+
+```{r}
+party_names = c('1' = "Democrat", '2' = "Independent", '3' = "Republican") # not dict, fix later maybe
+party_cols = c('lightblue', 'lightgreen', 'lightcoral')
+
+party_hist = function(pid){
+  data = filter(dlexp, pid3 == pid)
+  ggplot(data=data, aes(x=response)) + 
+  geom_bar(color="black", fill=party_cols[pid]) + facet_grid(party.cues ~ video, labeller = labeller(
+        party.cues = party_cue_names,
+        video = del_cue_names
+    )) + ggtitle(party_names[pid])
+  
+}
+
+party_hist(1)
+party_hist(2)
+party_hist(3)
+
+```
+
+```{r}
+del_cue_names = c('0' = "No Video", '1' = "Video")
+female_names = c('0' = "Male", '1' = "Female")
+white_names = c('0' = "Non-White", '1' = "White")
+
+hist_factor = function(binary_var, var_names){
+  ggplot(data=dlexp, aes(x=response)) + 
+  geom_bar(color="black", fill="lightblue") + facet_grid(rows = vars(.data[[binary_var]]), cols = vars(video),
+                                                         labeller = labeller( .rows = as_labeller(var_names), .cols = as_labeller(del_cue_names)))
+  
+}
+
+hist_factor("female", female_names)
+hist_factor("white", white_names)
+
+```
+
+
+```{r}
+dlexp %>% 
+   group_by(across(all_of(c("video","party.cues")))) %>% 
+   summarize(mean_response = mean(response))
+
+```
+
+
+```{r}
+dlexp$age_bucket <- NULL
+dlexp$age_bucket[dlexp$age < 30] <- "18_29"
+dlexp$age_bucket[dlexp$age %in% 30:39] <- "30_39"
+dlexp$age_bucket[dlexp$age %in% 40:49] <- "40_49"
+dlexp$age_bucket[dlexp$age %in% 50:59] <- "50_59"
+dlexp$age_bucket[dlexp$age %in% 60:69] <- "60_69"
+dlexp$age_bucket[dlexp$age >= 70] <- "70+"
+
+
+dlexp %>% 
+   group_by(across(all_of(c("age_bucket", "video")))) %>% 
+   summarize(mean_response=mean(response), cnt = n())
+```
+
+See how video does not affect opinion of age group 40-49 as much as others. This is not surprising ...
+
+```{r}
+dlexp$income_bucket <- NULL
+dlexp$income_bucket[dlexp$income <= 5] <- "0_5"
+dlexp$income_bucket[dlexp$income %in% 6:10] <- "6_10"
+dlexp$income_bucket[dlexp$income %in% 11:15] <- "11_15"
+dlexp$income_bucket[dlexp$income > 15] <- "16+"
+
+dlexp %>% 
+   group_by(across(all_of(c("income_bucket", "video")))) %>% 
+   summarize(mean_response=mean(response), cnt = n())
+```
+
+```{r}
+# classification from code_supp.R
+dlexp$educ4 <- NULL
+dlexp$educ4[dlexp$educ == 1 | dlexp$educ == 2] <- 1 # high school
+dlexp$educ4[dlexp$educ == 3 | dlexp$educ == 4] <- 2 # some college
+dlexp$educ4[dlexp$educ == 5] <- 3 # 4-year college degree
+dlexp$educ4[dlexp$educ == 6] <- 4 # graduate degree
+
+dlexp %>% 
+   group_by(across(all_of(c("educ4", "video")))) %>% 
+   summarize(mean_response=mean(response), cnt = n())
+```
+
+Again, notice how video does not seem to effect the "middleground" group as much as others.
