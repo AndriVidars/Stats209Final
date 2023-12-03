@@ -46,7 +46,7 @@ pVal <- function(tObserved, tzSims, M){
 
 ```{r}
 Z = dlexp$Z
-Y = dlexp$Y # response, -2:2
+Y = dlexp$Y # response, -2:2, could be 1-5, doesnt matter
 
 tObs = meanDiff(Z, Y)
 
@@ -86,7 +86,6 @@ ci <- function(that, vhat){
 
 
 v_hat = vHat(dlexp)
-
 print(ci(tObs, v_hat))
 ```
 
@@ -112,6 +111,24 @@ v_hat = vHat(dParty)
 print(v_hat)
 print(ci(tObs, v_hat))
 ```
+```{r}
+# run for each party separately
+
+runParty = function(data, pid){
+  dat = filter(data, pid3 == pid)
+  tau_hat = meanDiff(dat$Z, dat$Y)
+  v_hat = vHat(dat)
+  print(tau_hat)
+  print(ci(tau_hat, v_hat))
+  print("")
+}
+
+runParty(dParty, 1) # dem
+runParty(dParty, 2) # ind
+runParty(dParty, 3) # rep
+# No surprises here, same results as paper
+```
+
 
 ```{r}
 # Run post-stratification with political parties as strata
@@ -134,10 +151,6 @@ tauHatStrat = function(data, strata_col){
     nk = nrow(datStrat)
     tau_strat = meanDiff(datStrat$Z, datStrat$Y)
     tauHat = tauHat + (nk/n*tau_strat)
-    
-    print(k)
-    print(tau_strat)
-    print("")
   }
     
   return (tauHat)

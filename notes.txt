@@ -11,7 +11,8 @@ use methods that we have learned in class to dive deeper into this.
 around 50% of both treatment and ctrl get party cue, therefore only
 about 25% of total get true treatment
 
-
+issue with quantifying responses to survey:
+https://en.wikipedia.org/wiki/Likert_scale 
 
 
  

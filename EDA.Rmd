@@ -80,7 +80,6 @@ dlexp %>%
 # how to treat NA
 
 # california is roughly split 65-35 dem rep, while for the general population of the US is closer to 50-50
-# 
 ```
 
 
