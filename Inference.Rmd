@@ -45,8 +45,8 @@ pVal <- function(tObserved, tzSims, M){
 ```
 
 ```{r}
-Z = dlexp$video
-Y = dlexp$response
+Z = dlexp$Z
+Y = dlexp$Y # response, -2:2
 
 tObs = meanDiff(Z, Y)
 
@@ -56,18 +56,27 @@ p = pVal(tObs, tSims, M)
 
 print(tObs)
 print(p)
-
-# maybe some mistakes in code, keep getting 0 for p_val
 ```
+
+
 
 ```{r}
 # Neyman
 
-s_2_x <- function(x){
-  sub_ = filter(dlexp, video == x)
-  n_x = nrow(sub_)
+s_2_z <- function(data, z){
+  sub_ = filter(data, Z == z)
+  n_z = nrow(sub_)
 
-  return (c(var(sub_$response), n_x))
+  return (c(var(sub_$Y), n_z))
+}
+
+# conservative variance estimate
+vHat = function(data){
+  s_2_1 = s_2_z(data, 1)
+  s_2_0 = s_2_z(data, 0)
+
+  v_hat = (s_2_1[1]/s_2_1[2]) + (s_2_0[1]/s_2_0[2])
+  return (v_hat)
 }
 
 # normal approx 95% confidence interval
@@ -75,11 +84,95 @@ ci <- function(that, vhat){
   return (c(that - 1.96*sqrt(vhat), that + 1.96*sqrt(vhat)))
 }
 
-s_2_1 = s_2_x(1)
-s_2_0 = s_2_x(0)
 
-v_hat = (s_2_1[1]/s_2_1[2]) + (s_2_0[1]/s_2_0[2])
+v_hat = vHat(dlexp)
 
 print(ci(tObs, v_hat))
+```
+
+
+```{r}
+# discard those who did not get party cue
+dParty = filter(dlexp, party.cues == 1, !is.na(pid3)) # what to do with NA, discard for now
+Z = dParty$video
+Y = dParty$response
+tObs = meanDiff(Z, Y)
+
+# what is statistically significant
+tSims = frtSim(Z, Y, M, meanDiff)
+p = pVal(tObs, tSims, M)
+
+print(tObs)
+print(p)
+
+# plan, this should maybe be a stratified experiment on parties
+# Run for each party, then do a stratified experiment with all and conclude from those?
+
+v_hat = vHat(dParty)
+print(v_hat)
+print(ci(tObs, v_hat))
+```
+
+```{r}
+# Run post-stratification with political parties as strata
+# only including those who have seen the party clue(more relevant) - we could frame our "research question" as: Does knowing the conclusion from a minipublic have an effect on .... if
+# party stance on the issue/policy is known to the individual .... No?
+
+
+# peng-ding chapter 5
+# what to do with NA, discard for now
+
+# Stratification maybe not relevant, since covaraite(political party) split is even in treatment and control
+
+tauHatStrat = function(data, strata_col){
+  n = nrow(data)
+  strata = unique(data[[strata_col]])
+  
+  tauHat = 0
+  for (k in strata){
+    datStrat = filter(data, !!sym(strata_col) == k)
+    nk = nrow(datStrat)
+    tau_strat = meanDiff(datStrat$Z, datStrat$Y)
+    tauHat = tauHat + (nk/n*tau_strat)
+    
+    print(k)
+    print(tau_strat)
+    print("")
+  }
+    
+  return (tauHat)
+}
+
+vHatStrat = function(data, strata_col){
+  n = nrow(data)
+  strata = unique(data[[strata_col]])
+  
+  v_hat = 0
+  for (k in strata){
+    datStrat = filter(data, !!sym(strata_col) == k)
+    nk = nrow(datStrat)
+    v_h_k = vHat(datStrat)
+    v_hat = v_hat + ((nk/n)^2)*v_h_k
+  }
+    
+  return (v_hat)
+}
+
+
+
+tau_hat_s = tauHatStrat(dParty, "pid3")
+print(tau_hat_s)
+
+v_hat_s = vHatStrat(dParty, "pid3")
+print(v_hat_s)
+
+print(ci(tau_hat_s, v_hat_s))
+```
+
+```{r}
+# california is roughly split 65-35 dem rep, while for the general population of the US is closer to 50-50
+
+# how do we address that to generalize for the entire populion of the united states?
+# stratification/post-stratification is used to deal with imbalance in number of treated/ctrl within covariates
 ```
 

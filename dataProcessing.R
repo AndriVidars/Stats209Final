@@ -34,5 +34,14 @@ loadData = function(){
   dlexp$educ4[dlexp$educ == 5] <- 3 # 4-year college degree
   dlexp$educ4[dlexp$educ == 6] <- 4 # graduate degree
   
+  dlexp$pol_party <- NULL
+  dlexp$pol_party[dlexp$pid3 == 1] <- "Democrat"
+  dlexp$pol_party[dlexp$pid3 == 2] <- "Independent"
+  dlexp$pol_party[dlexp$pid3 == 3] <- "Republican"
+  
+  dlexp$Z = dlexp$video
+  dlexp$Y = dlexp$response
+  
   return (dlexp)
 }
+

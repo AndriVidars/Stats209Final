@@ -70,11 +70,24 @@ hist_factor("female", female_names)
 hist_factor("white", white_names)
 ```
 
+```{r}
+dlexp %>% 
+   filter(party.cues == 1) %>%
+   group_by(across(all_of(c("pol_party","video")))) %>%
+   summarize(cnt = n())
+
+# we have imbalance in political parties, howerver not imbalance between number of treated/ctrl for each party
+# how to treat NA
+
+# california is roughly split 65-35 dem rep, while for the general population of the US is closer to 50-50
+# 
+```
+
 
 ```{r}
 dlexp %>% 
    group_by(across(all_of(c("video","party.cues")))) %>% 
-   summarize(mean_response = mean(response))
+   summarize(mean_response = mean(response), cnt = n())
 ```
 
 
@@ -99,3 +112,10 @@ dlexp %>%
 ```
 
 Again, notice how video does not seem to effect the "middleground" group as much as others.
+
+```{r}
+dlexp %>% 
+   group_by(across(all_of(c("video", "response")))) %>% 
+   summarize(cnt = n())
+```
+
