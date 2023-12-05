@@ -9,7 +9,7 @@ loadData = function(){
   dlexpdata$response[dlexpdata$agree == "Disapprove somewhat"] <- -1
   dlexpdata$response[dlexpdata$agree == "Disapprove strongly"] <- -2
   
-  dlexp <- filter(dlexpdata, !is.na(response))
+  dlexp <- filter(dlexpdata, !is.na(response), !is.na(income))
   
   dlexp$female = factor(dlexp$female)
   dlexp$white = factor(dlexp$white)
@@ -22,11 +22,12 @@ loadData = function(){
   dlexp$age_bucket[dlexp$age %in% 60:69] <- "60_69"
   dlexp$age_bucket[dlexp$age >= 70] <- "70+"
   
-  dlexp$income_bucket <- NULL
-  dlexp$income_bucket[dlexp$income <= 5] <- "0_5"
-  dlexp$income_bucket[dlexp$income %in% 6:10] <- "6_10"
-  dlexp$income_bucket[dlexp$income %in% 11:15] <- "11_15"
-  dlexp$income_bucket[dlexp$income > 15] <- "16+"
+  incQuants = quantile(dlexp$income)
+  dlexp$incomeQuant <- NULL
+  dlexp$incomeQuant[dlexp$income <= incQuants[2]] <- "0-25"
+  dlexp$incomeQuant[dlexp$income >  incQuants[2] & dlexp$income <= incQuants[3]] <- "25-50"
+  dlexp$incomeQuant[dlexp$income >  incQuants[3] & dlexp$income <= incQuants[4]] <- "50-75"
+  dlexp$incomeQuant[dlexp$income >  incQuants[4]] <- "75-100"
   
   # classification from code_supp.R
   dlexp$educ4[dlexp$educ == 1 | dlexp$educ == 2] <- 1 # high school
@@ -34,6 +35,13 @@ loadData = function(){
   dlexp$educ4[dlexp$educ == 5] <- 3 # 4-year college degree
   dlexp$educ4[dlexp$educ == 6] <- 4 # graduate degree
   
+  dlexp$educationLevel[dlexp$educ == 1 | dlexp$educ == 2] <- "High School" # high school
+  dlexp$educationLevel[dlexp$educ == 3 | dlexp$educ == 4] <- "Some College Experience" 
+  dlexp$educationLevel[dlexp$educ == 5] <- "4-Year College Degree" 
+  dlexp$educationLevel[dlexp$educ == 6] <- "Graduate Degree"
+  
+  dlexp$educLevel = as.factor(dlexp$educ4)
+
   dlexp$pol_party <- NULL
   dlexp$pol_party[dlexp$pid3 == 1] <- "Democrat"
   dlexp$pol_party[dlexp$pid3 == 2] <- "Independent"

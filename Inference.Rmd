@@ -104,8 +104,6 @@ p = pVal(tObs, tSims, M)
 print(tObs)
 print(p)
 
-# plan, this should maybe be a stratified experiment on parties
-# Run for each party, then do a stratified experiment with all and conclude from those?
 
 v_hat = vHat(dParty)
 print(v_hat)
@@ -118,15 +116,31 @@ runParty = function(data, pid){
   dat = filter(data, pid3 == pid)
   tau_hat = meanDiff(dat$Z, dat$Y)
   v_hat = vHat(dat)
+  ci_ = ci(tau_hat, v_hat)
   print(tau_hat)
-  print(ci(tau_hat, v_hat))
-  print("")
+  print(ci_)
+  return (c(tau_hat, ci_))
 }
 
-runParty(dParty, 1) # dem
-runParty(dParty, 2) # ind
-runParty(dParty, 3) # rep
+neymDem = runParty(dParty, 1) # dem
+neymInd = runParty(dParty, 2) # ind
+neymRep = runParty(dParty, 3) # rep
 # No surprises here, same results as paper
+
+
+# plot confidence intervals
+df = rbind(neymDem, neymInd, neymRep)
+df <- as.data.frame(df)
+
+new_column_names <- c("tau_hat", "ci_lower", "ci_upper")
+colnames(df) <- new_column_names
+df$politicalParty = c("Democrat", "Independent", "Republican")
+
+
+ggplot(df, aes(politicalParty, tau_hat)) + geom_point() +  
+geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
+  xlab("Political Party") +
+  coord_flip()
 ```
 
 
@@ -183,9 +197,6 @@ print(ci(tau_hat_s, v_hat_s))
 ```
 
 ```{r}
-# california is roughly split 65-35 dem rep, while for the general population of the US is closer to 50-50
-
-# how do we address that to generalize for the entire populion of the united states?
-# stratification/post-stratification is used to deal with imbalance in number of treated/ctrl within covariates
+# regression adjustment / lins estimator
 ```
 
