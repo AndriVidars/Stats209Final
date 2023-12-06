@@ -9,9 +9,11 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r warning=FALSE}
 library(dplyr)
 source('dataProcessing.R')
+library(estimatr)
+library(randomForest)
 dlexp = loadData()
 ```
 
@@ -197,6 +199,197 @@ print(ci(tau_hat_s, v_hat_s))
 ```
 
 ```{r}
-# regression adjustment / lins estimator
+# start with simple lins estimator
+# need to check linearity assumptions later to verify validity of linear lins
+
+# run separately on each political party
+linsEst = function(pid){
+  df = filter(dParty, pid3 == pid)
+  Y = df$Y
+  Z = df$Z
+  X = model.matrix(~ 0 + income + educ4 + age + white, data = df) %>% scale(center = T, scale=F)
+  
+  model = lm(Y ~ Z + (X)*(1 + Z), data = df)
+  pred = predict(model, df)
+  res = df$Y - pred
+
+  plot(density(res))
+  return (model)
+}
+
+
+linsEst(1)
+linsEst(2)
+linsEst(3)
+
+# linearity assumpitons do not hold, do random forest instead
+
+```
+
+```{r}
+df = filter(dParty, Z == 1)
+Y = as.factor(df$Y)
+Z = df$Z
+X = model.matrix(~ income + educ4 + age + white + factor(pid3), data = df) %>% scale(center = T, scale=F)
+df = cbind(Z, data.frame(X), Y)
+
+
+# use random forest regression or classification?
+# analyzed as regression, is classification for now
+model = randomForest(Y ~ ., data = df)
+pred = predict(model, df)
+
+confmatTrain = table(pred, df$Y)
+print(confmatTrain)
+```
+
+```{r}
+dParty$white = as.numeric(dParty$white)
+dParty$Y_factor = as.factor(dParty$Y)
+df = filter(dParty, pid3 == 1)
+
+
+centerVars = function(dataCenter, dataShift){
+  vars = c("income", "educ4", "age", "white") # covariates to shift
+  data_ = dataShift
+  for (var in vars){
+    data_[, var] <- data_[, var] - mean(dataCenter[, var])
+  }
+  return (data_)
+}
+
+```
+
+
+
+```{r}
+# do on entire data first
+
+# one issue: Using classification to predict and then interpret as continuous??
+trainModel = function(data){
+  model = randomForest(Y_factor ~ income + educ4 + age + white, data = data)
+  return (model)
+}
+
+# calibrate on left out data
+
+# predict for x
+# training data: data that model was trained on
+predict_calibrate_cross = function(model,  x, leftout_data, training_data){
+  # shift left out data based on centering for training data
+  x_shifted = centerVars(training_data, x)
+  leftout_data_shifted = centerVars(training_data, leftout_data)
+    
+  n_d = nrow(leftout_data)
+  mu_hat = as.numeric(predict(model, x_shifted))
+  l_pred = as.numeric(predict(model, leftout_data_shifted))
+  
+  l_pred_shift = sum((leftout_data$Y) - l_pred)/n_d
+  
+  mu_out = mu_hat + l_pred_shift
+  return (mu_out)
+}
+
+
+# t_data: training data
+# l_data: left out data
+tau_pred_cross = function(control_model, treatment_model,
+                          control_t_data, treatment_t_data,
+                          control_l_data, treatment_l_data){
+  
+  n_t = nrow(control_t_data) + nrow(treatment_t_data)
+  
+  tau = (sum(treatment_t_data$Y) + 
+           sum(predict_calibrate_cross(treatment_model, control_t_data, treatment_l_data, treatment_t_data)) -
+           sum(control_t_data$Y) -
+           sum(predict_calibrate_cross(control_model, treatment_t_data, control_l_data, control_t_data)))/n_t
+  
+  return (tau)
+}
+
+t_pred_cross_total = function(control_model_1, control_model_2,
+                              treatment_model_1, treatment_model_2,
+                              control_data_1, control_data_2,
+                              treatment_data_1, treatment_data_2){
+  
+  n_1 = nrow(control_data_1) + nrow(treatment_data_1)
+  n_2 = nrow(control_data_2) + nrow(treatment_data_2)
+  n = n_1 + n_2
+  
+  t_out = (tau_pred_cross(control_model_2, treatment_model_2,
+                          control_data_1, treatment_data_1,
+                          control_data_2, treatment_data_2)*(n_1/n)) +
+    (tau_pred_cross(control_model_2, treatment_model_2,
+                    control_data_2, treatment_data_2,
+                    control_data_1, treatment_data_1)*(n_2/n))
+  
+  return (t_out)
+}
+
+
+get_tau_cross = function(data){
+  split_ind = sample(seq_len(nrow(data)), size = floor(0.5*nrow(data)))
+  
+  d1 = data[split_ind, ]
+  d1_centered = centerVars(d1, d1)
+  
+  d2 = data[-split_ind, ]
+  d2_centered = centerVars(d2, d2)
+  
+  d1_ctrl = filter(d1, Z == 0)
+  d1_ctrl_centered = filter(d1_centered, Z == 0)
+  d1_treatment = filter(d1, Z == 1)
+  d1_treatment_centered = filter(d1_centered, Z == 1)
+  
+  d2_ctrl = filter(d2, Z == 0)
+  d2_ctrl_centered = filter(d2_centered, Z == 0)
+  d2_treatment = filter(d2, Z == 1)
+  d2_treatment_centered = filter(d2_centered, Z == 1)
+  
+
+  ctrl_model_1 = trainModel(d1_ctrl_centered)
+  treatment_model_1 = trainModel(d1_treatment_centered)
+  
+  ctrl_model_2 = trainModel(d2_ctrl_centered)
+  treatment_model_2 = trainModel(d2_treatment_centered)
+  
+  
+  t_pred = t_pred_cross_total(ctrl_model_1, ctrl_model_2,
+                              treatment_model_1, treatment_model_2,
+                              d1_ctrl, d2_ctrl,
+                              d1_treatment, d2_treatment)
+  
+  return (t_pred)
+  
+}
+
+get_tau_cross(dParty)
+```
+
+```{r}
+# bootstrap variance, this takes a long time to run
+
+boostrapTau = function(data, tau_function, M){
+  t = vector(, M)
+  for (i in 1:M){
+    data_sample = sample_n(data, nrow(data), replace = TRUE)
+     t[i] = tau_function(data_sample)
+     
+     if (i %% 100 == 0){
+       print(i)
+     }
+  }
+  
+  return (t)
+}
+
+bootSample = boostrapTau(dParty, get_tau_cross, 1000)
+hist(bootSample)
+```
+
+
+
+```{r}
+hist(bootSample)
 ```
 
