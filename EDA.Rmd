@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(ggplot2)
 library(tidyr)
+library(corrplot)
 source('dataProcessing.R')
 ```
 
@@ -74,7 +75,8 @@ hist_factor("white", white_names)
 ```
 
 ```{r warning=FALSE,message=FALSE}
-# include this plot
+# USE THIS
+party_names = c('1' = "Democrat", '2' = "Independent", '3' = "Republican")
 
 dat = dlexp %>% 
    filter(party.cues == 1) %>%
@@ -99,6 +101,7 @@ party_bar(3)
 
 
 ```{r warning=FALSE,message=FALSE}
+# USE THIS
 datInc = dlexp %>% 
    filter(party.cues == 1) %>%
    group_by(across(all_of(c("pid3", "incomeQuant", "Z", "Y")))) %>%
@@ -119,6 +122,8 @@ income_plot(3)
 ```
 
 ```{r warning=FALSE,message=FALSE}
+# USE THIS
+
 datEduc = dlexp %>% 
    filter(party.cues == 1) %>%
    group_by(across(all_of(c("pid3", "educationLevel", "Z", "Y")))) %>%
@@ -147,6 +152,8 @@ educ_plot(3)
 ```
 
 ```{r}
+# Maybe use this, or do some other corrplot
+
 # Education-Income Correlation
 
 dat = transform(dlexp,
@@ -156,6 +163,13 @@ geom_boxplot(aes(fill=educationLevel)) + theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank())
 
+
+# dont known about the corrplot
+dat_sub = dlexp[, c("income", "educ4", "age")]
+cor_matrix <- cor(dat_sub)
+
+# Create a correlation plot using corrplot
+corrplot(cor_matrix, method = "color", type = "upper", order = "hclust")
 ```
 
 

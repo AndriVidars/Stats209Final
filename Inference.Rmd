@@ -14,12 +14,13 @@ library(dplyr)
 source('dataProcessing.R')
 library(estimatr)
 library(randomForest)
+library(latex2exp)
+library(ggplot2)
 dlexp = loadData()
 ```
 
 
 ```{r}
-#FRT
 meanDiff <- function(z, y){
   ZY = data.frame(z)
   ZY$y = y
@@ -47,6 +48,7 @@ pVal <- function(tObserved, tzSims, M){
 ```
 
 ```{r}
+# DONT USE
 Z = dlexp$Z
 Y = dlexp$Y # response, -2:2, could be 1-5, doesnt matter
 
@@ -64,7 +66,6 @@ print(p)
 
 ```{r}
 # Neyman
-
 s_2_z <- function(data, z){
   sub_ = filter(data, Z == z)
   n_z = nrow(sub_)
@@ -72,7 +73,7 @@ s_2_z <- function(data, z){
   return (c(var(sub_$Y), n_z))
 }
 
-# conservative variance estimate
+# conservative variance estimate for Neyman
 vHat = function(data){
   s_2_1 = s_2_z(data, 1)
   s_2_0 = s_2_z(data, 0)
@@ -93,13 +94,12 @@ print(ci(tObs, v_hat))
 
 
 ```{r}
+# USE THIS
+
 # discard those who did not get party cue
 dParty = filter(dlexp, party.cues == 1, !is.na(pid3)) # what to do with NA, discard for now
-Z = dParty$video
-Y = dParty$response
 tObs = meanDiff(Z, Y)
 
-# what is statistically significant
 tSims = frtSim(Z, Y, M, meanDiff)
 p = pVal(tObs, tSims, M)
 
@@ -112,16 +112,31 @@ print(v_hat)
 print(ci(tObs, v_hat))
 ```
 ```{r}
-# run for each party separately
+# USE THIS
 
+# run for each party separately
 runParty = function(data, pid){
   dat = filter(data, pid3 == pid)
   tau_hat = meanDiff(dat$Z, dat$Y)
   v_hat = vHat(dat)
   ci_ = ci(tau_hat, v_hat)
-  print(tau_hat)
-  print(ci_)
   return (c(tau_hat, ci_))
+}
+
+# plot confidence intervals for each party/group on same plot
+confIntPlot = function(dem, ind, rep, est_expr){
+  df = rbind(dem, ind, rep)
+  df <- as.data.frame(df)
+
+  new_column_names <- c("tau_hat", "ci_lower", "ci_upper")
+  colnames(df) <- new_column_names
+  df$politicalParty = c("Democrat", "Independent", "Republican")
+  
+  ggplot(df, aes(politicalParty, tau_hat)) + geom_point() +  
+    geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
+    xlab("Political Party") +
+    ylab(TeX(est_expr)) +
+    coord_flip()
 }
 
 neymDem = runParty(dParty, 1) # dem
@@ -130,24 +145,13 @@ neymRep = runParty(dParty, 3) # rep
 # No surprises here, same results as paper
 
 
-# plot confidence intervals
-df = rbind(neymDem, neymInd, neymRep)
-df <- as.data.frame(df)
-
-new_column_names <- c("tau_hat", "ci_lower", "ci_upper")
-colnames(df) <- new_column_names
-df$politicalParty = c("Democrat", "Independent", "Republican")
-
-
-ggplot(df, aes(politicalParty, tau_hat)) + geom_point() +  
-geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
-  xlab("Political Party") +
-  coord_flip()
+confIntPlot(neymDem, neymInd, neymRep, "$\\hat{\\tau}$")
 ```
 
 
 ```{r}
-# WE WILL NOT INCLUDE THIS
+# DONT USE THIS
+
 # Run post-stratification with political parties as strata
 # only including those who have seen the party clue(more relevant) - we could frame our "research question" as: Does knowing the conclusion from a minipublic have an effect on .... if
 # party stance on the issue/policy is known to the individual .... No?
@@ -189,7 +193,6 @@ vHatStrat = function(data, strata_col){
 }
 
 
-
 tau_hat_s = tauHatStrat(dParty, "pid3")
 print(tau_hat_s)
 
@@ -200,6 +203,7 @@ print(ci(tau_hat_s, v_hat_s))
 ```
 
 ```{r}
+# DONT USE THIS
 # this is crap, dont use!
 # start with simple lins estimator
 # need to check linearity assumptions later to verify validity of linear lins
@@ -229,6 +233,8 @@ linsEst(3)
 
 
 ```{r}
+# USE REST
+
 # begin Lin's here
 
 dParty$white = as.numeric(dParty$white)
@@ -237,7 +243,7 @@ df = filter(dParty, pid3 == 1)
 
 # shift by centering of other data
 centerVars = function(dataCenter, dataShift){
-  vars = c("income", "educ4", "age", "white") # covariates to shift
+  vars = c("income", "educ4", "age", "white") # covariates included in model, to shift
   data_ = dataShift
   for (var in vars){
     data_[, var] <- data_[, var] - mean(dataCenter[, var])
@@ -254,6 +260,7 @@ centerVars = function(dataCenter, dataShift){
 
 # Using classification to predict and then interpret as continuous??
 trainModel = function(data){
+  data = droplevels(data)
   model = randomForest(Y_factor ~ income + educ4 + age + white, data = data)
   return (model)
 }
@@ -354,7 +361,6 @@ tau_hat_all = get_tau_cross(dParty)
 
 ```{r}
 # bootstrap variance, this takes a long time to run
-
 boostrapTau = function(data, tau_function, M){
   t = vector(, M)
   for (i in 1:M){
@@ -365,7 +371,6 @@ boostrapTau = function(data, tau_function, M){
   
   return (t)
 }
-
 ```
 
 
@@ -381,22 +386,22 @@ ci(tau_hat_all, var(bootSampleAll))
 
 
 ```{r}
+# Run Lin's for each group
 runLins = function(pid){
   data = filter(dParty, pid3 == pid)
   tau_est = get_tau_cross(data)
   bootSample = boostrapTau(data, get_tau_cross, 1000)
-  hist(bootSample)
-  
+
   ci_boot = ci(tau_est, var(bootSample))
-  
   return (c(tau_est, ci_boot))
-  
 }
 
 (l1 = runLins(1)) # dem
-
-# error for ind/dem because of missing levels, how should we fix that? just omit missing levels for some subsets? or do random forest regression instead of classification
 (l2 = runLins(2)) # ind
 (l3 = runLins(3)) # rep
+```
+
+```{r}
+confIntPlot(l1, l2, l3, "$\\hat{\\tau}_L$")
 ```
 
