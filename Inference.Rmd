@@ -2,14 +2,14 @@
 title: "Inference"
 author: "Andri, Eden, Veronica"
 date: "11/19/2023"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r warning=FALSE}
+```{r warning=FALSE, message=FALSE}
 library(dplyr)
 source('dataProcessing.R')
 library(estimatr)
@@ -21,6 +21,7 @@ dlexp = loadData()
 
 
 ```{r}
+# Difference in means
 meanDiff <- function(z, y){
   ZY = data.frame(z)
   ZY$y = y
@@ -30,42 +31,28 @@ meanDiff <- function(z, y){
   return (mean(treat$y) - mean(ctrl$y))
 }
 
-# Fisher randomization test
-frtSim <- function(z, y, M, testStat){
-  tSims = vector(, M)
+# FRT
+frtSim <- function(z, y, M, testStat, tObserved){
+  pVals = vector(, M) # for p-value convergence
+  pValCnt = 0
   for (i in 1:M){
     set.seed(i)
     zSim = sample(z)
-    tSims[i] = testStat(zSim, y)
+    t = testStat(zSim, y)
+    if (t >= tObserved){
+      pValCnt = pValCnt + 1
+    }
+    pVals[i] = pValCnt/i
   }
 
-  return (tSims)
+  return (pVals)
 }
-
-pVal <- function(tObserved, tzSims, M){
-  return (length(which(tzSims >= tObserved))/M)
-}
-```
-
-```{r}
-# DONT USE
-Z = dlexp$Z
-Y = dlexp$Y # response, -2:2, could be 1-5, doesnt matter
-
-tObs = meanDiff(Z, Y)
-
-M = 10000
-tSims = frtSim(Z, Y, M, meanDiff)
-p = pVal(tObs, tSims, M)
-
-print(tObs)
-print(p)
 ```
 
 
 
 ```{r}
-# Neyman
+# Neymanian inference
 s_2_z <- function(data, z){
   sub_ = filter(data, Z == z)
   n_z = nrow(sub_)
@@ -86,35 +73,43 @@ vHat = function(data){
 ci <- function(that, vhat){
   return (c(that - 1.96*sqrt(vhat), that + 1.96*sqrt(vhat)))
 }
-
-
-v_hat = vHat(dlexp)
-print(ci(tObs, v_hat))
 ```
 
 
 ```{r}
-# USE THIS
-
 # discard those who did not get party cue
-dParty = filter(dlexp, party.cues == 1, !is.na(pid3)) # what to do with NA, discard for now
-tObs = meanDiff(Z, Y)
+dParty = filter(dlexp, party.cues == 1, !is.na(pid3))
 
-tSims = frtSim(Z, Y, M, meanDiff)
-p = pVal(tObs, tSims, M)
-
+# run difference in means
+tObs = meanDiff(dParty$Z, dParty$Y)
 print(tObs)
-print(p)
 
+# run frt
+pVals = frtSim(dParty$Z, dParty$Y, 10000, meanDiff, tObs)
+pVal = pVals[length(pVals)] # neg index does not work?
+print(pVal)
 
+# get neymanian variance estimate and confidence interval
 v_hat = vHat(dParty)
 print(v_hat)
 print(ci(tObs, v_hat))
 ```
-```{r}
-# USE THIS
 
-# run for each party separately
+```{r}
+# plot p-value convergence for FRT
+dfP <- data.frame(Index = seq_along(pVals), pVals = pVals)
+
+ggplot(dfP, aes(x = Index, y = pVals)) +
+  geom_line() +
+  labs(x = "Iteration", y = "p-value")
+```
+
+
+
+
+```{r}
+# run neymanian inference for each party/group separately
+
 runParty = function(data, pid){
   dat = filter(data, pid3 == pid)
   tau_hat = meanDiff(dat$Z, dat$Y)
@@ -139,9 +134,9 @@ confIntPlot = function(dem, ind, rep, est_expr){
     coord_flip()
 }
 
-neymDem = runParty(dParty, 1) # dem
-neymInd = runParty(dParty, 2) # ind
-neymRep = runParty(dParty, 3) # rep
+(neymDem = runParty(dParty, 1)) # dem
+(neymInd = runParty(dParty, 2)) # ind
+(neymRep = runParty(dParty, 3)) # rep
 # No surprises here, same results as paper
 
 
@@ -149,97 +144,11 @@ confIntPlot(neymDem, neymInd, neymRep, "$\\hat{\\tau}$")
 ```
 
 
-```{r}
-# DONT USE THIS
 
-# Run post-stratification with political parties as strata
-# only including those who have seen the party clue(more relevant) - we could frame our "research question" as: Does knowing the conclusion from a minipublic have an effect on .... if
-# party stance on the issue/policy is known to the individual .... No?
-
-
-# peng-ding chapter 5
-# what to do with NA, discard for now
-
-# Stratification maybe not relevant, since covaraite(political party) split is even in treatment and control
-
-tauHatStrat = function(data, strata_col){
-  n = nrow(data)
-  strata = unique(data[[strata_col]])
-  
-  tauHat = 0
-  for (k in strata){
-    datStrat = filter(data, !!sym(strata_col) == k)
-    nk = nrow(datStrat)
-    tau_strat = meanDiff(datStrat$Z, datStrat$Y)
-    tauHat = tauHat + (nk/n*tau_strat)
-  }
-    
-  return (tauHat)
-}
-
-vHatStrat = function(data, strata_col){
-  n = nrow(data)
-  strata = unique(data[[strata_col]])
-  
-  v_hat = 0
-  for (k in strata){
-    datStrat = filter(data, !!sym(strata_col) == k)
-    nk = nrow(datStrat)
-    v_h_k = vHat(datStrat)
-    v_hat = v_hat + ((nk/n)^2)*v_h_k
-  }
-    
-  return (v_hat)
-}
-
-
-tau_hat_s = tauHatStrat(dParty, "pid3")
-print(tau_hat_s)
-
-v_hat_s = vHatStrat(dParty, "pid3")
-print(v_hat_s)
-
-print(ci(tau_hat_s, v_hat_s))
-```
-
-```{r}
-# DONT USE THIS
-# this is crap, dont use!
-# start with simple lins estimator
-# need to check linearity assumptions later to verify validity of linear lins
-
-# run separately on each political party
-linsEst = function(pid){
-  df = filter(dParty, pid3 == pid)
-  Y = df$Y
-  Z = df$Z
-  X = model.matrix(~ 0 + income + educ4 + age + white, data = df) %>% scale(center = T, scale=F)
-  
-  model = lm(Y ~ Z + (X)*(1 + Z), data = df)
-  pred = predict(model, df)
-  res = df$Y - pred
-
-  plot(density(res))
-  return (model)
-}
-
-
-linsEst(1)
-linsEst(2)
-linsEst(3)
-
-# linearity assumpitons do not hold, do random forest instead
-```
 
 
 ```{r}
-# USE REST
-
-# begin Lin's here
-
-dParty$white = as.numeric(dParty$white)
 dParty$Y_factor = as.factor(dParty$Y)
-df = filter(dParty, pid3 == 1)
 
 # shift by centering of other data
 centerVars = function(dataCenter, dataShift){
@@ -250,7 +159,6 @@ centerVars = function(dataCenter, dataShift){
   }
   return (data_)
 }
-
 ```
 
 
@@ -258,7 +166,7 @@ centerVars = function(dataCenter, dataShift){
 ```{r}
 # Generalized Lin's Estimator with random forest model
 
-# Using classification to predict and then interpret as continuous??
+# Using classification to predict and then interpret as continuous for variance te/var calc
 trainModel = function(data){
   data = droplevels(data)
   model = randomForest(Y_factor ~ income + educ4 + age + white, data = data)
@@ -355,12 +263,12 @@ get_tau_cross = function(data){
   
 }
 
-# note, this is somewhat volatile with regards to seed for data split, should we do mean of x runs? if yes, how is that treated in bootstrap(same?)
-tau_hat_all = get_tau_cross(dParty) 
+tau_hat_all = get_tau_cross(dParty)
+print(tau_hat_all) # treatment effect estimate
 ```
 
 ```{r}
-# bootstrap variance, this takes a long time to run
+# bootstrap variance, this takes a long time to run for generalized Lin's
 boostrapTau = function(data, tau_function, M){
   t = vector(, M)
   for (i in 1:M){
@@ -368,11 +276,9 @@ boostrapTau = function(data, tau_function, M){
     data_sample = sample_n(data, nrow(data), replace = TRUE)
      t[i] = tau_function(data_sample)
   }
-  
   return (t)
 }
 ```
-
 
 
 ```{r}
@@ -380,13 +286,13 @@ bootSampleAll = boostrapTau(dParty, get_tau_cross, 1000)
 ```
 
 ```{r}
-hist(bootSampleAll)
+# confidence interval for treatment effect when running on entire dataset
 ci(tau_hat_all, var(bootSampleAll))
 ```
 
 
 ```{r}
-# Run Lin's for each group
+# Run Lin's for each group and get confidence intervals for the treatment effect for each group
 runLins = function(pid){
   data = filter(dParty, pid3 == pid)
   tau_est = get_tau_cross(data)
@@ -402,6 +308,7 @@ runLins = function(pid){
 ```
 
 ```{r}
+# plot confidence intervals for treatment effect from generalized Lin's estimator, per group
 confIntPlot(l1, l2, l3, "$\\hat{\\tau}_L$")
 ```
 

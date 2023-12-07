@@ -1,5 +1,3 @@
-
-
 loadData = function(){
   load("dlexpdata.rdata")
   dlexpdata$response <- NA
@@ -10,17 +8,6 @@ loadData = function(){
   dlexpdata$response[dlexpdata$agree == "Disapprove strongly"] <- -2
   
   dlexp <- filter(dlexpdata, !is.na(response), !is.na(income))
-  
-  dlexp$female = factor(dlexp$female)
-  dlexp$white = factor(dlexp$white)
-  
-  dlexp$age_bucket <- NULL
-  dlexp$age_bucket[dlexp$age < 30] <- "18_29"
-  dlexp$age_bucket[dlexp$age %in% 30:39] <- "30_39"
-  dlexp$age_bucket[dlexp$age %in% 40:49] <- "40_49"
-  dlexp$age_bucket[dlexp$age %in% 50:59] <- "50_59"
-  dlexp$age_bucket[dlexp$age %in% 60:69] <- "60_69"
-  dlexp$age_bucket[dlexp$age >= 70] <- "70+"
   
   incQuants = quantile(dlexp$income)
   dlexp$incomeQuant <- NULL

@@ -2,7 +2,7 @@
 title: "Stats 209 Final - EDA"
 author: "Andri, Eden, Veronica"
 date: "11/8/2023"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -23,61 +23,8 @@ dlexp = loadData()
 ```
 
 
-```{r}
-# start of with plots displaying Z and Y, not including X
-del_cue_names <- c('0' = "No Video", '1' = "Video")
-party_cue_names <- c('0' = "No Party Cue", '1' = "Party Cue")
-
-
-ggplot(data=dlexp, aes(x=response)) + 
-  geom_bar(color="black", fill="lightblue") + facet_grid(party.cues ~ video, labeller = labeller(
-        party.cues = party_cue_names,
-        video = del_cue_names
-    ))
-
-```
-
-```{r}
-party_names = c('1' = "Democrat", '2' = "Independent", '3' = "Republican") # not dict, fix later maybe
-party_cols = c('lightblue', 'lightgreen', 'lightcoral')
-
-party_hist = function(pid){
-  data = filter(dlexp, pid3 == pid)
-  ggplot(data=data, aes(x=response)) + 
-  geom_bar(color="black", fill=party_cols[pid]) + facet_grid(party.cues ~ video, labeller = labeller(
-        party.cues = party_cue_names,
-        video = del_cue_names
-    )) + ggtitle(party_names[pid])
-  
-}
-
-party_hist(1)
-party_hist(2)
-party_hist(3)
-```
-
-
-
-```{r}
-del_cue_names = c('0' = "No Video", '1' = "Video")
-female_names = c('0' = "Male", '1' = "Female")
-white_names = c('0' = "Non-White", '1' = "White")
-
-hist_factor = function(binary_var, var_names){
-  ggplot(data=dlexp, aes(x=response)) + 
-  geom_bar(color="black", fill="lightblue") + facet_grid(rows = vars(.data[[binary_var]]), cols = vars(video),
-                                                         labeller = labeller( .rows = as_labeller(var_names), .cols = as_labeller(del_cue_names)))
-  
-}
-
-hist_factor("female", female_names)
-hist_factor("white", white_names)
-```
-
 ```{r warning=FALSE,message=FALSE}
-# USE THIS
 party_names = c('1' = "Democrat", '2' = "Independent", '3' = "Republican")
-
 dat = dlexp %>% 
    filter(party.cues == 1) %>%
    group_by(across(all_of(c("pid3", "Z", "Y")))) %>%
@@ -85,14 +32,13 @@ dat = dlexp %>%
 
 dat$Z = as.factor(dat$Z)
 
-
+# barplot showing responses for treatment/control for selected political party
 party_bar = function(pid){
   dat_ = filter(dat, pid3 == pid)
   ggplot(data=dat_, aes(x=Y, y=Frequency, fill=Z)) +
     geom_bar(stat="identity",  position="dodge", colour = "black") + ggtitle(party_names[pid])
   
 }
-
 
 party_bar(1)
 party_bar(2)
@@ -101,7 +47,6 @@ party_bar(3)
 
 
 ```{r warning=FALSE,message=FALSE}
-# USE THIS
 datInc = dlexp %>% 
    filter(party.cues == 1) %>%
    group_by(across(all_of(c("pid3", "incomeQuant", "Z", "Y")))) %>%
@@ -109,10 +54,13 @@ datInc = dlexp %>%
 
 datInc$Z = as.factor(datInc$Z)
 
+# show breakdown for responses by income quantile, per group
 income_plot = function(pid){
   dat = filter(datInc, pid3 == pid)
   ggplot(data=dat, aes(x=Y, y=Frequency, fill=Z)) + 
-    geom_bar(stat="identity",  position="dodge", colour = "black") + facet_wrap(~incomeQuant, scales = "free") + ggtitle(party_names[pid])
+    geom_bar(stat="identity",  position="dodge", colour = "black") +
+    facet_wrap(~incomeQuant, scales = "free") +
+    ggtitle(party_names[pid])
   
 }
 
@@ -123,7 +71,6 @@ income_plot(3)
 
 ```{r warning=FALSE,message=FALSE}
 # USE THIS
-
 datEduc = dlexp %>% 
    filter(party.cues == 1) %>%
    group_by(across(all_of(c("pid3", "educationLevel", "Z", "Y")))) %>%
@@ -131,18 +78,20 @@ datEduc = dlexp %>%
 
 datEduc$Z = as.factor(datEduc$Z)
 
+# show breakdown for responses by education level, per group
 educ_plot = function(pid){
   dat = filter(datEduc, pid3 == pid)
   
   # maintain order of education - high school, college, ....
   dat = transform(dat,
-      educationLevel=factor(educationLevel,levels=c("High School","Some College Experience","4-Year College Degree", "Graduate Degree")))
+      educationLevel=factor(educationLevel,
+                            levels=c("High School","Some College Experience","4-Year College Degree", "Graduate Degree")))
 
   ggplot(data = dat,
-      aes(x=Y, y=Frequency, fill=Z)) + geom_bar(stat="identity",  position="dodge", colour = "black") +
+      aes(x=Y, y=Frequency, fill=Z)) +
+    geom_bar(stat="identity",  position="dodge", colour = "black") +
     facet_wrap(~educationLevel, scales = "free") +
     ggtitle(party_names[pid])
-    
   
 }
 
@@ -152,8 +101,6 @@ educ_plot(3)
 ```
 
 ```{r}
-# Maybe use this, or do some other corrplot
-
 # Education-Income Correlation
 
 dat = transform(dlexp,
@@ -164,42 +111,9 @@ geom_boxplot(aes(fill=educationLevel)) + theme(axis.title.x=element_blank(),
         axis.ticks.x=element_blank())
 
 
-# dont known about the corrplot
 dat_sub = dlexp[, c("income", "educ4", "age")]
 cor_matrix <- cor(dat_sub)
 
-# Create a correlation plot using corrplot
 corrplot(cor_matrix, method = "color", type = "upper", order = "hclust")
 ```
-
-
-
-```{r}
-dlexp %>% 
-   group_by(across(all_of(c("video","party.cues")))) %>% 
-   summarize(mean_response = mean(response), cnt = n())
-```
-
-
-```{r}
-dlexp %>% 
-   group_by(across(all_of(c("age_bucket", "video")))) %>% 
-   summarize(mean_response=mean(response), cnt = n())
-```
-
-See how video does not affect opinion of age group 40-49 as much as others. This is not surprising ...
-
-```{r}
-dd = dlexp %>% 
-   group_by(across(all_of(c("income_bucket", "video", "pol_party")))) %>% 
-   summarize(mean_response=mean(response), cnt = n())
-```
-
-```{r}
-dlexp %>% 
-   group_by(across(all_of(c("educ4", "video")))) %>% 
-   summarize(mean_response=mean(response), cnt = n())
-```
-
-Again, notice how video does not seem to effect the "middleground" group as much as others.
 
