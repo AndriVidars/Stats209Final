@@ -64,9 +64,24 @@ income_plot = function(pid){
   
 }
 
+income_plot_ = function(){
+  datInc_ = dlexp %>% 
+   filter(party.cues == 1) %>%
+   group_by(across(all_of(c("incomeQuant", "Z", "Y")))) %>%
+   summarize(Frequency = n())
+
+  datInc_$Z = as.factor(datInc_$Z)
+  
+  ggplot(data=datInc_, aes(x=Y, y=Frequency, fill=Z)) + 
+    geom_bar(stat="identity",  position="dodge", colour = "black") +
+    facet_wrap(~incomeQuant, scales = "free") +
+    ggtitle("Distribution of responses by income quartiles")
+}
+
 income_plot(1)
 income_plot(2)
 income_plot(3)
+income_plot_()
 ```
 
 ```{r warning=FALSE,message=FALSE}
@@ -95,9 +110,28 @@ educ_plot = function(pid){
   
 }
 
+educ_plot_ = function(){
+  educ_ = dlexp %>% 
+   filter(party.cues == 1) %>%
+   group_by(across(all_of(c("educationLevel", "Z", "Y")))) %>%
+   summarize(Frequency = n())
+  
+  educ_ = transform(educ_,
+      educationLevel=factor(educationLevel,
+                            levels=c("High School","Some College Experience","4-Year College Degree", "Graduate Degree")))
+
+  educ_$Z = as.factor(educ_$Z)
+  
+  ggplot(data=educ_, aes(x=Y, y=Frequency, fill=Z)) + 
+    geom_bar(stat="identity",  position="dodge", colour = "black") +
+    facet_wrap(~educationLevel, scales = "free") +
+    ggtitle("Distribution of responses by education level")
+}
+
 educ_plot(1)
 educ_plot(2)
 educ_plot(3)
+educ_plot_()
 ```
 
 ```{r}

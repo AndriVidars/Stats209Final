@@ -129,7 +129,7 @@ confIntPlot = function(dem, ind, rep, est_expr){
   
   ggplot(df, aes(politicalParty, tau_hat)) + geom_point() +  
     geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper)) +
-    xlab("Political Party") +
+    xlab("") +
     ylab(TeX(est_expr)) +
     coord_flip()
 }
